@@ -1,0 +1,15 @@
+# Dependências e binários do Go
+backend/vendor/
+backend/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Variáveis de ambiente
+.env
+backend/.env
+
+# Bancos de dados e volumes
+pgdata/
