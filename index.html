@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinFlux - Gestão Financeira Familiar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#111827',
+                            900: '#0f172a',
+                            950: '#020617',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.5); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(71, 85, 105, 0.8); }
+        
+        /* Tree view connector styling */
+        .tree-line-v { position: absolute; left: 50%; width: 2px; background-color: #334155; }
+        .tree-card { transition: all 0.2s ease-in-out; }
+        .tree-card:hover { transform: translateY(-2px); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col md:flex-row antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Sidebar -->
+    <aside class="w-full md:w-64 bg-slate-900 border-r border-slate-800/80 flex flex-col justify-between shrink-0">
+        <div>
+            <!-- Logo Header -->
+            <div class="p-6 flex items-center justify-between border-b border-slate-800/80">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+                        <i data-lucide="users" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight tracking-tight text-white" id="familyNameDisplay">Família Silva</h1>
+                        <p class="text-xs text-slate-400 font-medium">Gestão Multiusuário</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nav Links -->
+            <nav class="p-4 space-y-1.5">
+                <a href="#overview" class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 transition-all">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    Visão Geral
+                </a>
+                <a href="#family-tree" class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-all">
+                    <i data-lucide="git-fork" class="w-4 h-4"></i>
+                    Árvore & Rendas
+                </a>
+                <a href="#transactions" class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-all">
+                    <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+                    Transações
+                </a>
+                <a href="#budgets" class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-all">
+                    <i data-lucide="pie-chart" class="w-4 h-4"></i>
+                    Orçamentos
+                </a>
+            </nav>
+        </div>
+
+        <!-- Quick Profile Switcher / Actions -->
+        <div class="p-4 border-t border-slate-800/80 space-y-2">
+            <button onclick="openFamilySettingsModal()" class="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 font-semibold transition-all">
+                <span class="flex items-center gap-2">
+                    <i data-lucide="settings" class="w-4 h-4 text-indigo-400"></i>
+                    Configurar Família
+                </span>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+            </button>
+            <button onclick="openMemberModal()" class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-semibold transition-all">
+                <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+                Adicionar Membro
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto">
+        
+        <!-- Header Controls -->
+        <header class="sticky top-0 z-10 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+                <div class="flex items-center gap-2">
+                    <h2 class="text-xl font-bold text-slate-100" id="headerTitle">Painel Consolidado</h2>
+                    <span class="px-2 py-0.5 text-[10px] uppercase font-bold rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" id="activeFilterBadge">Todos os Membros</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">Controle de entradas, despesas e contribuição financeira familiar.</p>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-3 self-end sm:self-auto">
+                <!-- Seletor de Perfil Ativo / Consolidado -->
+                <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5">
+                    <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400 mr-2"></i>
+                    <select id="memberFilter" onchange="filterData()" class="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer">
+                        <option value="all">Consolidado Família</option>
+                        <!-- Preenchido via JavaScript com a árvore de usuários -->
+                    </select>
+                </div>
+
+                <!-- Seletor de Período -->
+                <select id="periodFilter" onchange="filterData()" class="bg-slate-900 border border-slate-800 text-slate-200 text-xs font-semibold rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500 cursor-pointer">
+                    <option value="all">Todo o Período</option>
+                    <option value="this-month" selected>Este Mês</option>
+                    <option value="last-month">Mês Passado</option>
+                    <option value="year">Este Ano</option>
+                </select>
+
+                <button onclick="openTransactionModal()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl px-4 py-2.5 transition-all shadow-lg shadow-indigo-600/20 active:scale-95">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    Nova Transação
+                </button>
+            </div>
+        </header>
+
+        <!-- Dashboard Content Container -->
+        <div class="p-6 space-y-6 max-w-7xl w-full mx-auto" id="overview">
+
+            <!-- Top Summary Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                <!-- Receita Total -->
+                <div class="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-sm hover:border-slate-700/80 transition-all">
+                    <div class="flex items-center justify-between text-slate-400 mb-3">
+                        <span class="text-xs font-semibold tracking-wider uppercase">Entradas Totais</span>
+                        <div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                            <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-100" id="cardIncome">R$ 0,00</div>
+                    <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
+                        <span id="incomeSubtext">Renda Fixa + Variável</span>
+                        <span class="text-emerald-400 font-semibold" id="incomeMemberShare">100%</span>
+                    </div>
+                </div>
+
+                <!-- Gastos Totais -->
+                <div class="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-sm hover:border-slate-700/80 transition-all">
+                    <div class="flex items-center justify-between text-slate-400 mb-3">
+                        <span class="text-xs font-semibold tracking-wider uppercase">Gastos Totais</span>
+                        <div class="p-2 rounded-xl bg-rose-500/10 text-rose-400">
+                            <i data-lucide="arrow-down-right" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-100" id="cardExpenses">R$ 0,00</div>
+                    <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
+                        <span id="expensesSubtext">Saídas do Período</span>
+                        <span class="text-rose-400 font-semibold" id="expenseMemberShare">--</span>
+                    </div>
+                </div>
+
+                <!-- Saldo Livre -->
+                <div class="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-sm hover:border-slate-700/80 transition-all">
+                    <div class="flex items-center justify-between text-slate-400 mb-3">
+                        <span class="text-xs font-semibold tracking-wider uppercase">Saldo Disponível</span>
+                        <div class="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
+                            <i data-lucide="piggy-bank" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-100" id="cardBalance">R$ 0,00</div>
+                    <div class="mt-2 flex items-center gap-1.5 text-xs text-indigo-400">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                        <span class="font-medium">Livre para investimento/lazer</span>
+                    </div>
+                </div>
+
+                <!-- Retenção / Economia -->
+                <div class="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-sm hover:border-slate-700/80 transition-all">
+                    <div class="flex items-center justify-between text-slate-400 mb-3">
+                        <span class="text-xs font-semibold tracking-wider uppercase">Membros Ativos</span>
+                        <div class="p-2 rounded-xl bg-violet-500/10 text-violet-400">
+                            <i data-lucide="users" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-100" id="cardMemberCount">0</div>
+                    <div class="mt-2 flex items-center gap-1.5 text-xs text-violet-400">
+                        <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+                        <span class="font-medium" id="totalFixedIncomeText">Renda familiar base</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Family Tree & Income Matrix Section -->
+            <div class="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-6 shadow-sm space-y-6" id="family-tree">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800/80 pb-4">
+                    <div>
+                        <h3 class="font-bold text-slate-100 text-lg flex items-center gap-2">
+                            <i data-lucide="git-fork" class="w-5 h-5 text-indigo-400"></i>
+                            Estrutura e Árvore de Rendas Familiares
+                        </h3>
+                        <p class="text-xs text-slate-400">Hierarquia de geradores de renda e participação percentual no orçamento total da casa.</p>
+                    </div>
+                    <button onclick="openMemberModal()" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl px-3.5 py-2 transition-all">
+                        <i data-lucide="user-plus" class="w-4 h-4 text-indigo-400"></i>
+                        Novo Integrante
+                    </button>
+                </div>
+
+                <!-- Family Tree Visual Display -->
+                <div id="treeContainer" class="p-4 bg-slate-950/60 rounded-xl border border-slate-800/60 min-h-[220px] flex flex-col justify-center items-center">
+                    <!-- Gerado dinamicamente via JavaScript -->
+                </div>
+            </div>
+
+            <!-- Main Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="charts">
+                <!-- Ganhos vs Gastos (Bar Chart) -->
+                <div class="lg:col-span-2 bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="font-bold text-slate-200 text-base">Fluxo Mensal de Caixa</h3>
+                            <p class="text-xs text-slate-400">Ganhos vs Gastos por mês (Filtrado)</p>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs font-medium">
+                            <span class="inline-flex items-center gap-1.5 text-emerald-400">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Entradas
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 text-rose-400">
+                                <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Saídas
+                            </span>
+                        </div>
+                    </div>
+                    <div class="h-72 relative w-full">
+                        <canvas id="incomeExpenseChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Categorias de Gastos (Donut Chart) -->
+                <div class="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                    <div class="mb-4">
+                        <h3 class="font-bold text-slate-200 text-base">Distribuição das Despesas</h3>
+                        <p class="text-xs text-slate-400">Divisão por categoria no período</p>
+                    </div>
+                    <div class="h-64 relative w-full flex items-center justify-center">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Section: Transactions & Budgets -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Tabela de Transações Recentes -->
+                <div class="lg:col-span-2 bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-sm" id="transactions">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5">
+                        <div>
+                            <h3 class="font-bold text-slate-200 text-base">Lançamentos Financeiros</h3>
+                            <p class="text-xs text-slate-400">Entradas e saídas atribuídas por membro</p>
+                        </div>
+                        
+                        <!-- Search & Filter -->
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <input type="text" id="searchInput" onkeyup="renderTransactions()" placeholder="Buscar lançamentos..." class="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 w-full sm:w-36">
+                            <select id="typeFilter" onchange="renderTransactions()" class="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+                                <option value="all">Todos Tipos</option>
+                                <option value="income">Entradas</option>
+                                <option value="expense">Saídas</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Table Container -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead>
+                                <tr class="text-slate-400 border-b border-slate-800 uppercase tracking-wider font-semibold">
+                                    <th class="pb-3 px-2">Membro</th>
+                                    <th class="pb-3 px-2">Descrição</th>
+                                    <th class="pb-3 px-2">Categoria</th>
+                                    <th class="pb-3 px-2">Data</th>
+                                    <th class="pb-3 px-2 text-right">Valor</th>
+                                    <th class="pb-3 px-2 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionsTableBody" class="divide-y divide-slate-800/60 font-medium">
+                                <!-- Preenchido via Javascript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Metas e Orçamento por Categoria -->
+                <div class="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-sm" id="budgets">
+                    <div class="mb-5 flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-slate-200 text-base">Limites por Categoria</h3>
+                            <p class="text-xs text-slate-400">Controle mensal de teto de gastos</p>
+                        </div>
+                    </div>
+
+                    <div id="budgetList" class="space-y-4">
+                        <!-- Preenchido via JavaScript -->
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal Member Manager (Add / Edit) -->
+    <div id="memberModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl relative transform transition-transform duration-200 scale-95" id="memberModalContainer">
+            <button onclick="closeMemberModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-200">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <h3 class="text-lg font-bold text-slate-100 mb-1" id="memberModalTitle">Adicionar Membro Familiar</h3>
+            <p class="text-xs text-slate-400 mb-5">Configure as informações do integrante da casa.</p>
+
+            <form id="memberForm" onsubmit="handleSaveMember(event)" class="space-y-4">
+                <input type="hidden" id="memberEditId">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nome Completo / Apelido</label>
+                    <input type="text" id="memberName" required placeholder="Ex: Carlos Silva" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Papel na Família</label>
+                        <select id="memberRole" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <option value="Pai">Pai</option>
+                            <option value="Mãe">Mãe</option>
+                            <option value="Filho">Filho</option>
+                            <option value="Filha">Filha</option>
+                            <option value="Familiar">Outro Familiar</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Avatar / Ícone</label>
+                        <select id="memberAvatar" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <option value="user font-bold">👤 Padrão</option>
+                            <option value="user-check">👨 Pai / Responsável</option>
+                            <option value="heart">👩 Mãe / Responsável</option>
+                            <option value="smile">👦 Filho / Criança</option>
+                            <option value="sparkles">👧 Filha / Criança</option>
+                            <option value="briefcase">💼 Profissional</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Renda Mensal Fixa / Salário (R$)</label>
+                    <input type="number" step="0.01" id="memberFixedIncome" required placeholder="0,00" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                    <p class="text-[10px] text-slate-500 mt-1">Este valor entra na projeção fixa de renda familiar.</p>
+                </div>
+
+                <div class="pt-3 flex gap-3">
+                    <button type="button" onclick="closeMemberModal()" class="w-1/2 py-2.5 rounded-xl border border-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-800/50 transition-all">Cancelar</button>
+                    <button type="submit" class="w-1/2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition-all shadow-lg shadow-indigo-600/20">Salvar Integrante</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Family Name Editor -->
+    <div id="familySettingsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative transform transition-transform duration-200 scale-95" id="familySettingsModalContainer">
+            <button onclick="closeFamilySettingsModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-200">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <h3 class="text-lg font-bold text-slate-100 mb-1">Nome da Família</h3>
+            <p class="text-xs text-slate-400 mb-5">Altere o nome exibido no topo do dashboard.</p>
+
+            <form onsubmit="handleSaveFamilyName(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nome do Grupo Familiar</label>
+                    <input type="text" id="familyInputName" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div class="pt-2 flex gap-3">
+                    <button type="button" onclick="closeFamilySettingsModal()" class="w-1/2 py-2.5 rounded-xl border border-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-800/50 transition-all">Cancelar</button>
+                    <button type="submit" class="w-1/2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition-all">Atualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Add Transaction -->
+    <div id="transactionModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl relative transform transition-transform duration-200 scale-95" id="txModalContainer">
+            <button onclick="closeTransactionModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-200">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <h3 class="text-lg font-bold text-slate-100 mb-1">Nova Transação</h3>
+            <p class="text-xs text-slate-400 mb-5">Atribua um lançamento a um integrante da família.</p>
+
+            <form id="transactionForm" onsubmit="handleAddTransaction(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Integrante Responsável</label>
+                    <select id="txMemberId" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                        <!-- Preenchido dinamicamente com os membros -->
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Descrição</label>
+                    <input type="text" id="txDescription" required placeholder="Ex: Salário Mensal, Supermercado..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Valor (R$)</label>
+                        <input type="number" step="0.01" id="txAmount" required placeholder="0,00" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Tipo</label>
+                        <select id="txType" onchange="updateCategoryOptions()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <option value="income">Entrada / Ganho</option>
+                            <option value="expense">Saída / Gasto</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Categoria</label>
+                        <select id="txCategory" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <!-- Preenchido dinamicamente -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Data</label>
+                        <input type="date" id="txDate" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div class="pt-3 flex gap-3">
+                    <button type="button" onclick="closeTransactionModal()" class="w-1/2 py-2.5 rounded-xl border border-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-800/50 transition-all">Cancelar</button>
+                    <button type="submit" class="w-1/2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition-all shadow-lg shadow-indigo-600/20">Registrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Initial Default Data
+        const DEFAULT_FAMILY_NAME = "Família Silva";
+        
+        const DEFAULT_MEMBERS = [
+            { id: 'm1', name: 'Roberto Silva', role: 'Pai', fixedIncome: 6500.00, avatar: 'user-check' },
+            { id: 'm2', name: 'Mariana Silva', role: 'Mãe', fixedIncome: 5200.00, avatar: 'heart' },
+            { id: 'm3', name: 'Lucas Silva', role: 'Filho', fixedIncome: 1200.00, avatar: 'smile' },
+            { id: 'm4', name: 'Beatriz Silva', role: 'Filha', fixedIncome: 0.00, avatar: 'sparkles' }
+        ];
+
+        const DEFAULT_TRANSACTIONS = [
+            { id: 't1', memberId: 'm1', description: 'Salário Roberto', amount: 6500.00, type: 'income', category: 'Salário', date: '2026-10-01' },
+            { id: 't2', memberId: 'm2', description: 'Salário Mariana', amount: 5200.00, type: 'income', category: 'Salário', date: '2026-10-01' },
+            { id: 't3', memberId: 'm3', description: 'Estágio Lucas', amount: 1200.00, type: 'income', category: 'Freelance', date: '2026-10-02' },
+            { id: 't4', memberId: 'm1', description: 'Aluguel Casa', amount: 2800.00, type: 'expense', category: 'Moradia', date: '2026-10-02' },
+            { id: 't5', memberId: 'm2', description: 'Supermercado Mês', amount: 1600.00, type: 'expense', category: 'Alimentação', date: '2026-10-04' },
+            { id: 't6', memberId: 'm3', description: 'Faculdade Lucas', amount: 750.00, type: 'expense', category: 'Educação', date: '2026-10-05' },
+            { id: 't7', memberId: 'm4', description: 'Curso de Inglês', amount: 350.00, type: 'expense', category: 'Educação', date: '2026-10-05' },
+            { id: 't8', memberId: 'm1', description: 'Combustível Carro', amount: 450.00, type: 'expense', category: 'Transporte', date: '2026-10-05' }
+        ];
+
+        const CATEGORIES = {
+            income: ['Salário', 'Freelance', 'Investimentos', 'Mesada', 'Outros'],
+            expense: ['Moradia', 'Alimentação', 'Transporte', 'Lazer', 'Saúde', 'Educação', 'Investimentos', 'Outros']
+        };
+
+        const BUDGET_LIMITS = {
+            'Moradia': 3000,
+            'Alimentação': 2200,
+            'Transporte': 800,
+            'Educação': 1500,
+            'Lazer': 800
+        };
+
+        // Persistent State
+        let familyName = localStorage.getItem('finflux_family_name') || DEFAULT_FAMILY_NAME;
+        let members = JSON.parse(localStorage.getItem('finflux_members')) || DEFAULT_MEMBERS;
+        let transactions = JSON.parse(localStorage.getItem('finflux_txs')) || DEFAULT_TRANSACTIONS;
+
+        let mainChart = null;
+        let donutChart = null;
+
+        // Initialize Application
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            document.getElementById('txDate').valueAsDate = new Date();
+            updateFamilyNameDisplay();
+            updateCategoryOptions();
+            refreshMemberSelects();
+            filterData();
+        });
+
+        function saveState() {
+            localStorage.setItem('finflux_family_name', familyName);
+            localStorage.setItem('finflux_members', JSON.stringify(members));
+            localStorage.setItem('finflux_txs', JSON.stringify(transactions));
+        }
+
+        function formatCurrency(val) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+        }
+
+        function updateFamilyNameDisplay() {
+            document.getElementById('familyNameDisplay').innerText = familyName;
+            document.getElementById('familyInputName').value = familyName;
+        }
+
+        // Member Select Dynamic Population
+        function refreshMemberSelects() {
+            const memberFilter = document.getElementById('memberFilter');
+            const txMemberId = document.getElementById('txMemberId');
+
+            const selectedFilter = memberFilter.value;
+            const selectedTxMember = txMemberId.value;
+
+            memberFilter.innerHTML = '<option value="all">Consolidado Família</option>';
+            txMemberId.innerHTML = '';
+
+            members.forEach(m => {
+                const opt1 = document.createElement('option');
+                opt1.value = m.id;
+                opt1.textContent = `${m.name} (${m.role})`;
+                memberFilter.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = m.id;
+                opt2.textContent = `${m.name} (${m.role})`;
+                txMemberId.appendChild(opt2);
+            });
+
+            if (selectedFilter) memberFilter.value = selectedFilter;
+            if (selectedTxMember) txMemberId.value = selectedTxMember;
+        }
+
+        // Get Filtered Transactions
+        function getFilteredTransactions() {
+            const memberId = document.getElementById('memberFilter').value;
+            const period = document.getElementById('periodFilter').value;
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+
+            return transactions.filter(tx => {
+                // Member filter
+                if (memberId !== 'all' && tx.memberId !== memberId) {
+                    return false;
+                }
+
+                // Period filter
+                const txDate = new Date(tx.date + 'T00:00:00');
+                if (period === 'this-month') {
+                    return txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear;
+                } else if (period === 'last-month') {
+                    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+                    const yearOfLastMonth = currentMonth === 0 ? currentYear - 1 : currentYear;
+                    return txDate.getMonth() === lastMonth && txDate.getFullYear() === yearOfLastMonth;
+                } else if (period === 'year') {
+                    return txDate.getFullYear() === currentYear;
+                }
+                return true;
+            });
+        }
+
+        // Filter and Refresh Dashboard
+        function filterData() {
+            const memberFilterVal = document.getElementById('memberFilter').value;
+            const activeMember = members.find(m => m.id === memberFilterVal);
+
+            if (activeMember) {
+                document.getElementById('headerTitle').innerText = activeMember.name;
+                document.getElementById('activeFilterBadge').innerText = activeMember.role;
+            } else {
+                document.getElementById('headerTitle').innerText = 'Painel Consolidado';
+                document.getElementById('activeFilterBadge').innerText = 'Todos os Membros';
+            }
+
+            const filteredTxs = getFilteredTransactions();
+
+            // Total Calculations
+            const totalIncome = filteredTxs
+                .filter(t => t.type === 'income')
+                .reduce((s, t) => s + t.amount, 0);
+
+            const totalExpenses = filteredTxs
+                .filter(t => t.type === 'expense')
+                .reduce((s, t) => s + t.amount, 0);
+
+            const balance = totalIncome - totalExpenses;
+
+            // Compute total house fixed income
+            const houseFixedIncome = members.reduce((s, m) => s + m.fixedIncome, 0);
+
+            // Render Overview Cards
+            document.getElementById('cardIncome').innerText = formatCurrency(totalIncome);
+            document.getElementById('cardExpenses').innerText = formatCurrency(totalExpenses);
+            document.getElementById('cardBalance').innerText = formatCurrency(balance);
+            document.getElementById('cardMemberCount').innerText = members.length;
+            document.getElementById('totalFixedIncomeText').innerText = `Base Fixa: ${formatCurrency(houseFixedIncome)}`;
+
+            // Share Calculations
+            if (activeMember && houseFixedIncome > 0) {
+                const share = ((activeMember.fixedIncome / houseFixedIncome) * 100).toFixed(1);
+                document.getElementById('incomeMemberShare').innerText = `${share}% da base`;
+            } else {
+                document.getElementById('incomeMemberShare').innerText = '100% da Casa';
+            }
+
+            renderFamilyTree();
+            renderTransactions();
+            renderBudgets(filteredTxs);
+            updateCharts();
+        }
+
+        // Render Family Tree Diagram
+        function renderFamilyTree() {
+            const container = document.getElementById('treeContainer');
+            const totalFixedIncome = members.reduce((s, m) => s + m.fixedIncome, 0);
+
+            // Group Members by Roles (Parents vs Children)
+            const parents = members.filter(m => m.role === 'Pai' || m.role === 'Mãe');
+            const children = members.filter(m => m.role !== 'Pai' && m.role !== 'Mãe');
+
+            let html = `
+                <div class="w-full flex flex-col items-center space-y-6">
+                    <!-- Root House Node -->
+                    <div class="bg-indigo-600/20 border border-indigo-500/40 rounded-2xl p-3 px-6 text-center flex items-center gap-3 shadow-lg">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
+                            <i data-lucide="home" class="w-4 h-4"></i>
+                        </div>
+                        <div class="text-left">
+                            <h4 class="text-xs font-bold text-slate-100">${familyName}</h4>
+                            <p class="text-[10px] text-indigo-300 font-semibold">Renda Fixa Total: ${formatCurrency(totalFixedIncome)}</p>
+                        </div>
+                    </div>
+
+                    <!-- Parents Level -->
+                    <div class="w-full flex flex-wrap justify-center gap-4 relative">
+            `;
+
+            const renderMemberCard = (m) => {
+                const percent = totalFixedIncome > 0 ? ((m.fixedIncome / totalFixedIncome) * 100).toFixed(0) : 0;
+                return `
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 w-60 shadow-md tree-card flex flex-col justify-between relative group">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-indigo-400">
+                                    <i data-lucide="${m.avatar || 'user'}" class="w-4 h-4"></i>
+                                </div>
+                                <div>
+                                    <h5 class="text-xs font-bold text-slate-100">${m.name}</h5>
+                                    <span class="text-[10px] font-semibold text-slate-400">${m.role}</span>
+                                </div>
+                            </div>
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                <button onclick="editMember('${m.id}')" class="text-slate-400 hover:text-indigo-400 p-1"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="deleteMember('${m.id}')" class="text-slate-400 hover:text-rose-400 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 pt-2 border-t border-slate-800/80 flex justify-between items-center text-xs">
+                            <span class="text-[11px] text-slate-400">Renda Fixa:</span>
+                            <span class="font-bold text-emerald-400">${formatCurrency(m.fixedIncome)}</span>
+                        </div>
+
+                        <!-- Progress Share Bar -->
+                        <div class="mt-1.5 w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-indigo-500 h-full rounded-full" style="width: ${percent}%"></div>
+                        </div>
+                        <span class="text-[9px] text-slate-500 text-right mt-0.5">${percent}% da renda familiar</span>
+                    </div>
+                `;
+            };
+
+            parents.forEach(m => {
+                html += renderMemberCard(m);
+            });
+
+            html += `</div>`;
+
+            if (children.length > 0) {
+                html += `
+                    <!-- Divider Line -->
+                    <div class="w-12 h-px bg-slate-800"></div>
+                    
+                    <!-- Children Level -->
+                    <div class="w-full flex flex-wrap justify-center gap-4">
+                `;
+                children.forEach(m => {
+                    html += renderMemberCard(m);
+                });
+                html += `</div>`;
+            }
+
+            html += `</div>`;
+            container.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        // Render Transactions Table
+        function renderTransactions() {
+            const tbody = document.getElementById('transactionsTableBody');
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const type = document.getElementById('typeFilter').value;
+
+            const filteredTxs = getFilteredTransactions().filter(tx => {
+                const m = members.find(mem => mem.id === tx.memberId);
+                const memberName = m ? m.name.toLowerCase() : '';
+                const matchesSearch = tx.description.toLowerCase().includes(search) || tx.category.toLowerCase().includes(search) || memberName.includes(search);
+                const matchesType = type === 'all' || tx.type === type;
+                return matchesSearch && matchesType;
+            });
+
+            filteredTxs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if (filteredTxs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="py-8 text-center text-slate-500 font-normal">
+                            Nenhum lançamento encontrado para os filtros selecionados.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filteredTxs.map(tx => {
+                const member = members.find(m => m.id === tx.memberId) || { name: 'Desconhecido', role: 'N/A' };
+                const isIncome = tx.type === 'income';
+                const formattedDate = new Date(tx.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition-colors">
+                        <td class="py-3 px-2">
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-indigo-400 text-[10px] font-bold">
+                                    ${member.name.substring(0, 2).toUpperCase()}
+                                </div>
+                                <span class="text-slate-300 font-medium">${member.name}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-2 text-slate-200 font-semibold">${tx.description}</td>
+                        <td class="py-3 px-2">
+                            <span class="inline-block px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-slate-800 text-slate-300 border border-slate-700/60">
+                                ${tx.category}
+                            </span>
+                        </td>
+                        <td class="py-3 px-2 text-slate-400">${formattedDate}</td>
+                        <td class="py-3 px-2 text-right font-bold ${isIncome ? 'text-emerald-400' : 'text-slate-200'}">
+                            ${isIncome ? '+' : '-'} ${formatCurrency(tx.amount)}
+                        </td>
+                        <td class="py-3 px-2 text-center">
+                            <button onclick="deleteTransaction('${tx.id}')" class="text-slate-500 hover:text-rose-400 p-1 rounded-md transition-colors" title="Excluir">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        function deleteTransaction(id) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveState();
+            filterData();
+        }
+
+        // Render Category Budgets
+        function renderBudgets(currentFilteredTxs) {
+            const container = document.getElementById('budgetList');
+            container.innerHTML = '';
+
+            const categoryExpenses = {};
+            currentFilteredTxs.filter(t => t.type === 'expense').forEach(t => {
+                categoryExpenses[t.category] = (categoryExpenses[t.category] || 0) + t.amount;
+            });
+
+            Object.entries(BUDGET_LIMITS).forEach(([category, limit]) => {
+                const spent = categoryExpenses[category] || 0;
+                const percentage = Math.min(100, Math.round((spent / limit) * 100));
+
+                let progressColor = 'bg-indigo-500';
+                if (percentage > 90) progressColor = 'bg-rose-500';
+                else if (percentage > 75) progressColor = 'bg-amber-500';
+
+                container.innerHTML += `
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-medium">
+                            <span class="text-slate-200">${category}</span>
+                            <span class="text-slate-400">${formatCurrency(spent)} <span class="text-slate-600">/ ${formatCurrency(limit)}</span></span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                            <div class="${progressColor} h-full rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Charts Logic
+        function updateCharts() {
+            const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            const currentYear = new Date().getFullYear();
+            const memberId = document.getElementById('memberFilter').value;
+
+            const incomeData = new Array(12).fill(0);
+            const expenseData = new Array(12).fill(0);
+
+            transactions.forEach(tx => {
+                if (memberId !== 'all' && tx.memberId !== memberId) return;
+
+                const txDate = new Date(tx.date + 'T00:00:00');
+                if (txDate.getFullYear() === currentYear) {
+                    const monthIdx = txDate.getMonth();
+                    if (tx.type === 'income') incomeData[monthIdx] += tx.amount;
+                    else expenseData[monthIdx] += tx.amount;
+                }
+            });
+
+            const ctxMain = document.getElementById('incomeExpenseChart').getContext('2d');
+            if (mainChart) mainChart.destroy();
+
+            mainChart = new Chart(ctxMain, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [
+                        { label: 'Entradas', data: incomeData, backgroundColor: '#10b981', borderRadius: 6, barThickness: 12 },
+                        { label: 'Saídas', data: expenseData, backgroundColor: '#f43f5e', borderRadius: 6, barThickness: 12 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.raw)}` } }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } },
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 }, callback: (v) => 'R$ ' + v } }
+                    }
+                }
+            });
+
+            // Donut Chart logic
+            const filteredExpenses = getFilteredTransactions().filter(t => t.type === 'expense');
+            const categorySums = {};
+            filteredExpenses.forEach(t => {
+                categorySums[t.category] = (categorySums[t.category] || 0) + t.amount;
+            });
+
+            const categoryLabels = Object.keys(categorySums);
+            const categoryValues = Object.values(categorySums);
+
+            const ctxDonut = document.getElementById('categoryChart').getContext('2d');
+            if (donutChart) donutChart.destroy();
+
+            donutChart = new Chart(ctxDonut, {
+                type: 'doughnut',
+                data: {
+                    labels: categoryLabels.length ? categoryLabels : ['Sem Gastos'],
+                    datasets: [{
+                        data: categoryValues.length ? categoryValues : [1],
+                        backgroundColor: categoryValues.length ? [
+                            '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#f43f5e', '#64748b'
+                        ] : ['#334155'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12, boxWidth: 10 } },
+                        tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${formatCurrency(ctx.raw)}` } }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        // Member Modal Actions
+        function openMemberModal(editId = null) {
+            const modal = document.getElementById('memberModal');
+            const container = document.getElementById('memberModalContainer');
+            
+            if (editId) {
+                const member = members.find(m => m.id === editId);
+                if (member) {
+                    document.getElementById('memberModalTitle').innerText = 'Editar Membro';
+                    document.getElementById('memberEditId').value = member.id;
+                    document.getElementById('memberName').value = member.name;
+                    document.getElementById('memberRole').value = member.role;
+                    document.getElementById('memberAvatar').value = member.avatar || 'user';
+                    document.getElementById('memberFixedIncome').value = member.fixedIncome;
+                }
+            } else {
+                document.getElementById('memberModalTitle').innerText = 'Adicionar Membro Familiar';
+                document.getElementById('memberForm').reset();
+                document.getElementById('memberEditId').value = '';
+            }
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                container.classList.remove('scale-95');
+                container.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeMemberModal() {
+            const modal = document.getElementById('memberModal');
+            const container = document.getElementById('memberModalContainer');
+            container.classList.remove('scale-100');
+            container.classList.add('scale-95');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        }
+
+        function handleSaveMember(e) {
+            e.preventDefault();
+            const editId = document.getElementById('memberEditId').value;
+            const name = document.getElementById('memberName').value;
+            const role = document.getElementById('memberRole').value;
+            const avatar = document.getElementById('memberAvatar').value;
+            const fixedIncome = parseFloat(document.getElementById('memberFixedIncome').value) || 0;
+
+            if (editId) {
+                const m = members.find(mem => mem.id === editId);
+                if (m) {
+                    m.name = name;
+                    m.role = role;
+                    m.avatar = avatar;
+                    m.fixedIncome = fixedIncome;
+                }
+            } else {
+                const newMember = {
+                    id: 'm_' + Date.now(),
+                    name,
+                    role,
+                    avatar,
+                    fixedIncome
+                };
+                members.push(newMember);
+            }
+
+            saveState();
+            refreshMemberSelects();
+            filterData();
+            closeMemberModal();
+        }
+
+        function editMember(id) {
+            openMemberModal(id);
+        }
+
+        function deleteMember(id) {
+            if (members.length <= 1) {
+                alert('É necessário manter pelo menos um membro na família.');
+                return;
+            }
+            members = members.filter(m => m.id !== id);
+            // Re-assign transactions of deleted member to first available member
+            transactions.forEach(t => {
+                if (t.memberId === id) t.memberId = members[0].id;
+            });
+
+            saveState();
+            refreshMemberSelects();
+            filterData();
+        }
+
+        // Family Name Modal
+        function openFamilySettingsModal() {
+            const modal = document.getElementById('familySettingsModal');
+            const container = document.getElementById('familySettingsModalContainer');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                container.classList.remove('scale-95');
+                container.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeFamilySettingsModal() {
+            const modal = document.getElementById('familySettingsModal');
+            const container = document.getElementById('familySettingsModalContainer');
+            container.classList.remove('scale-100');
+            container.classList.add('scale-95');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        }
+
+        function handleSaveFamilyName(e) {
+            e.preventDefault();
+            familyName = document.getElementById('familyInputName').value;
+            saveState();
+            updateFamilyNameDisplay();
+            renderFamilyTree();
+            closeFamilySettingsModal();
+        }
+
+        // Transaction Modal Controls
+        function openTransactionModal() {
+            const modal = document.getElementById('transactionModal');
+            const container = document.getElementById('txModalContainer');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                container.classList.remove('scale-95');
+                container.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeTransactionModal() {
+            const modal = document.getElementById('transactionModal');
+            const container = document.getElementById('txModalContainer');
+            container.classList.remove('scale-100');
+            container.classList.add('scale-95');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        }
+
+        function updateCategoryOptions() {
+            const type = document.getElementById('txType').value;
+            const categorySelect = document.getElementById('txCategory');
+            categorySelect.innerHTML = CATEGORIES[type].map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        function handleAddTransaction(e) {
+            e.preventDefault();
+            const newTx = {
+                id: 't_' + Date.now(),
+                memberId: document.getElementById('txMemberId').value,
+                description: document.getElementById('txDescription').value,
+                amount: parseFloat(document.getElementById('txAmount').value),
+                type: document.getElementById('txType').value,
+                category: document.getElementById('txCategory').value,
+                date: document.getElementById('txDate').value
+            };
+
+            transactions.push(newTx);
+            saveState();
+            filterData();
+            closeTransactionModal();
+            document.getElementById('transactionForm').reset();
+            document.getElementById('txDate').valueAsDate = new Date();
+        }
+    </script>
+</body>
+</html>
