@@ -76,3 +76,22 @@ func (h *FamilyHandler) ListMembers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, members)
 }
+
+func (h *FamilyHandler) UpdateMember(c *gin.Context) {
+	memberID := c.Param("id")
+
+	var input usecase.UpdateMemberInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos: " + err.Error()})
+		return
+	}
+	input.ID = memberID
+
+	member, err := h.useCase.UpdateMember(c.Request.Context(), input)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar membro: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, member)
+}

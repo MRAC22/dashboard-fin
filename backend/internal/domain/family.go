@@ -9,7 +9,7 @@ import (
 var (
 	ErrFamilyNotFound = errors.New("família não encontrada")
 	ErrMemberNotFound = errors.New("membro não encontrado")
-	ErrInvalidName     = errors.New("o nome não pode ser vazio")
+	ErrInvalidName    = errors.New("o nome não pode ser vazio")
 )
 
 type Family struct {
@@ -20,11 +20,12 @@ type Family struct {
 }
 
 type Member struct {
-	ID        string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	FamilyID  string    `json:"family_id" gorm:"index;not null"`
-	Name      string    `json:"name" gorm:"not null"`
-	Role      string    `json:"role" gorm:"default:'member'"` // e.g., admin, member, child
-	CreatedAt time.Time `json:"created_at"`
+	ID         string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	FamilyID   string    `json:"family_id" gorm:"index;not null"`
+	Name       string    `json:"name" gorm:"not null"`
+	Role       string    `json:"role" gorm:"default:'member'"` // e.g., admin, member, child
+	BaseIncome float64   `json:"base_income" gorm:"column:base_income;default:0"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type FamilyRepository interface {
@@ -32,4 +33,5 @@ type FamilyRepository interface {
 	FindFamilyByID(ctx context.Context, id string) (*Family, error)
 	AddMember(ctx context.Context, member *Member) error
 	ListMembersByFamilyID(ctx context.Context, familyID string) ([]Member, error)
+	UpdateMember(ctx context.Context, member *Member) error
 }

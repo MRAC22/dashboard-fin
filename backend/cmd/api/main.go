@@ -60,10 +60,12 @@ func main() {
 
 	r := gin.Default()
 
-	// 3. Servir o arquivo estático index.html da raiz
+	// 3. Servir o arquivo estático index.html da raiz de forma segura
 	indexPath := findIndexHTML()
 	if indexPath != "" {
-		r.StaticFile("/", indexPath)
+		r.GET("/", func(c *gin.Context) {
+			c.File(indexPath)
+		})
 	} else {
 		log.Println("[Aviso] index.html não foi encontrado.")
 	}
@@ -102,6 +104,7 @@ func main() {
 	api.GET("/families/:id", familyHandler.GetFamily)
 	api.POST("/families/:id/members", familyHandler.AddMember)
 	api.GET("/families/:id/members", familyHandler.ListMembers)
+	api.PUT("/members/:id", familyHandler.UpdateMember)
 
 	port := os.Getenv("PORT")
 	if port == "" {

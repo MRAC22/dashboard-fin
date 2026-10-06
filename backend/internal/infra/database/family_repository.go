@@ -41,3 +41,7 @@ func (r *familyRepository) ListMembersByFamilyID(ctx context.Context, familyID s
 	err := r.db.WithContext(ctx).Where("family_id = ?", familyID).Find(&members).Error
 	return members, err
 }
+
+func (r *familyRepository) UpdateMember(ctx context.Context, member *domain.Member) error {
+	return r.db.WithContext(ctx).Save(member).Error
+}
