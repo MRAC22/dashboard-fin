@@ -14,36 +14,35 @@ import (
 )
 
 func main() {
-	// Carrega arquivo .env se existir
 	_ = godotenv.Load()
 
-	// 1. Conexão com o PostgreSQL (O GORM cria as tabelas via AutoMigrate)
+	// 1. Conexão com o PostgreSQL
 	db, err := database.NewPostgresConnection()
 	if err != nil {
 		log.Fatalf("Erro ao conectar ao banco de dados: %v", err)
 	}
 	log.Println("Conexão com o PostgreSQL realizada com sucesso!")
 
-	// 2. Dependências da aplicação
+	// 2. Injeção de Dependências
 	txRepo := database.NewTransactionRepository(db)
 	txUseCase := usecase.NewTransactionUseCase(txRepo)
 	txHandler := handler.NewTransactionHandler(txUseCase)
 
 	r := gin.Default()
 
-	// 3. Rota de Healthcheck (Pública)
+	// 3. Healthcheck público
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	// 4. Configuração opcional do Keycloak JWT Auth
+	// 4. Configuração do Keycloak Auth
 	keycloakURL := os.Getenv("KEYCLOAK_URL")
 	keycloakAuth, err := auth.NewKeycloakAuth(keycloakURL)
 	if err != nil {
 		log.Printf("Aviso: Keycloak não configurado ou indisponível (%v). Rotas protegidas desativadas temporariamente.", err)
 	}
 
-	// 5. Rotas da API
+	// 5. Rotas da API V1
 	api := r.Group("/api/v1")
 	if keycloakAuth != nil {
 		api.Use(keycloakAuth.Middleware())
@@ -55,7 +54,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "8000"
 	}
 
 	log.Printf("Servidor rodando na porta %s", port)
