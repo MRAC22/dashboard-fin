@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"dashboard-fin/internal/delivery/http/handler"
+	"dashboard-fin/internal/domain"
 	"dashboard-fin/internal/infra/auth"
 	"dashboard-fin/internal/infra/database"
 	"dashboard-fin/internal/usecase"
@@ -23,10 +24,20 @@ func main() {
 	}
 	log.Println("Conexão com o PostgreSQL realizada com sucesso!")
 
-	// 2. Injeção de Dependências
+	// Executa AutoMigrate para garantir que as tabelas de famílias e membros existem
+	if err := db.AutoMigrate(&domain.Family{}, &domain.Member{}, &domain.Transaction{}); err != nil {
+		log.Fatalf("Erro ao executar AutoMigrate: %v", err)
+	}
+
+	// 2. Injeção de Dependências - Transações
 	txRepo := database.NewTransactionRepository(db)
 	txUseCase := usecase.NewTransactionUseCase(txRepo)
 	txHandler := handler.NewTransactionHandler(txUseCase)
+
+	// Injeção de Dependências - Famílias & Membros
+	familyRepo := database.NewFamilyRepository(db)
+	familyUseCase := usecase.NewFamilyUseCase(familyRepo)
+	familyHandler := handler.NewFamilyHandler(familyUseCase)
 
 	r := gin.Default()
 
@@ -48,9 +59,16 @@ func main() {
 		api.Use(keycloakAuth.Middleware())
 	}
 
+	// Rotas de Transações
 	api.POST("/transactions", txHandler.Create)
 	api.GET("/transactions", txHandler.List)
 	api.DELETE("/transactions/:id", txHandler.Delete)
+
+	// Rotas de Famílias e Membros
+	api.POST("/families", familyHandler.CreateFamily)
+	api.GET("/families/:id", familyHandler.GetFamily)
+	api.POST("/families/:id/members", familyHandler.AddMember)
+	api.GET("/families/:id/members", familyHandler.ListMembers)
 
 	port := os.Getenv("PORT")
 	if port == "" {
