@@ -116,7 +116,7 @@
                     <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400 mr-2"></i>
                     <select id="memberFilter" onchange="filterData()" class="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer">
                         <option value="all">Consolidado Família</option>
-                        <!-- Preenchido via JavaScript com a árvore de usuários -->
+                        <!-- Preenchido via JavaScript -->
                     </select>
                 </div>
 
@@ -455,6 +455,9 @@
     </div>
 
     <script>
+        // API Base URL
+        const API_URL = 'http://localhost:8000/api/v1';
+
         // Initial Default Data
         const DEFAULT_FAMILY_NAME = "Família Silva";
         
@@ -492,551 +495,90 @@
         // Persistent State
         let familyName = localStorage.getItem('finflux_family_name') || DEFAULT_FAMILY_NAME;
         let members = JSON.parse(localStorage.getItem('finflux_members')) || DEFAULT_MEMBERS;
-        let transactions = JSON.parse(localStorage.getItem('finflux_txs')) || DEFAULT_TRANSACTIONS;
+        let transactions = JSON.parse(localStorage.getItem('finflux_transactions')) || DEFAULT_TRANSACTIONS;
+        let familyId = localStorage.getItem('finflux_family_id') || null;
 
-        let mainChart = null;
-        let donutChart = null;
+        let incomeExpenseChart = null;
+        let categoryChart = null;
 
-        // Initialize Application
-        window.addEventListener('DOMContentLoaded', () => {
-            lucide.createIcons();
-            document.getElementById('txDate').valueAsDate = new Date();
-            updateFamilyNameDisplay();
-            updateCategoryOptions();
-            refreshMemberSelects();
-            filterData();
-        });
-
-        function saveState() {
-            localStorage.setItem('finflux_family_name', familyName);
-            localStorage.setItem('finflux_members', JSON.stringify(members));
-            localStorage.setItem('finflux_txs', JSON.stringify(transactions));
-        }
-
-        function formatCurrency(val) {
+        // Utility: Format BRL Currency
+        const formatCurrency = (val) => {
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
-        }
+        };
 
-        function updateFamilyNameDisplay() {
-            document.getElementById('familyNameDisplay').innerText = familyName;
-            document.getElementById('familyInputName').value = familyName;
-        }
-
-        // Member Select Dynamic Population
-        function refreshMemberSelects() {
-            const memberFilter = document.getElementById('memberFilter');
-            const txMemberId = document.getElementById('txMemberId');
-
-            const selectedFilter = memberFilter.value;
-            const selectedTxMember = txMemberId.value;
-
-            memberFilter.innerHTML = '<option value="all">Consolidado Família</option>';
-            txMemberId.innerHTML = '';
-
-            members.forEach(m => {
-                const opt1 = document.createElement('option');
-                opt1.value = m.id;
-                opt1.textContent = `${m.name} (${m.role})`;
-                memberFilter.appendChild(opt1);
-
-                const opt2 = document.createElement('option');
-                opt2.value = m.id;
-                opt2.textContent = `${m.name} (${m.role})`;
-                txMemberId.appendChild(opt2);
-            });
-
-            if (selectedFilter) memberFilter.value = selectedFilter;
-            if (selectedTxMember) txMemberId.value = selectedTxMember;
-        }
-
-        // Get Filtered Transactions
-        function getFilteredTransactions() {
-            const memberId = document.getElementById('memberFilter').value;
-            const period = document.getElementById('periodFilter').value;
-            const now = new Date();
-            const currentYear = now.getFullYear();
-            const currentMonth = now.getMonth();
-
-            return transactions.filter(tx => {
-                // Member filter
-                if (memberId !== 'all' && tx.memberId !== memberId) {
-                    return false;
-                }
-
-                // Period filter
-                const txDate = new Date(tx.date + 'T00:00:00');
-                if (period === 'this-month') {
-                    return txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear;
-                } else if (period === 'last-month') {
-                    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-                    const yearOfLastMonth = currentMonth === 0 ? currentYear - 1 : currentYear;
-                    return txDate.getMonth() === lastMonth && txDate.getFullYear() === yearOfLastMonth;
-                } else if (period === 'year') {
-                    return txDate.getFullYear() === currentYear;
-                }
-                return true;
-            });
-        }
-
-        // Filter and Refresh Dashboard
-        function filterData() {
-            const memberFilterVal = document.getElementById('memberFilter').value;
-            const activeMember = members.find(m => m.id === memberFilterVal);
-
-            if (activeMember) {
-                document.getElementById('headerTitle').innerText = activeMember.name;
-                document.getElementById('activeFilterBadge').innerText = activeMember.role;
-            } else {
-                document.getElementById('headerTitle').innerText = 'Painel Consolidado';
-                document.getElementById('activeFilterBadge').innerText = 'Todos os Membros';
-            }
-
-            const filteredTxs = getFilteredTransactions();
-
-            // Total Calculations
-            const totalIncome = filteredTxs
-                .filter(t => t.type === 'income')
-                .reduce((s, t) => s + t.amount, 0);
-
-            const totalExpenses = filteredTxs
-                .filter(t => t.type === 'expense')
-                .reduce((s, t) => s + t.amount, 0);
-
-            const balance = totalIncome - totalExpenses;
-
-            // Compute total house fixed income
-            const houseFixedIncome = members.reduce((s, m) => s + m.fixedIncome, 0);
-
-            // Render Overview Cards
-            document.getElementById('cardIncome').innerText = formatCurrency(totalIncome);
-            document.getElementById('cardExpenses').innerText = formatCurrency(totalExpenses);
-            document.getElementById('cardBalance').innerText = formatCurrency(balance);
-            document.getElementById('cardMemberCount').innerText = members.length;
-            document.getElementById('totalFixedIncomeText').innerText = `Base Fixa: ${formatCurrency(houseFixedIncome)}`;
-
-            // Share Calculations
-            if (activeMember && houseFixedIncome > 0) {
-                const share = ((activeMember.fixedIncome / houseFixedIncome) * 100).toFixed(1);
-                document.getElementById('incomeMemberShare').innerText = `${share}% da base`;
-            } else {
-                document.getElementById('incomeMemberShare').innerText = '100% da Casa';
-            }
-
-            renderFamilyTree();
-            renderTransactions();
-            renderBudgets(filteredTxs);
-            updateCharts();
-        }
-
-        // Render Family Tree Diagram
-        function renderFamilyTree() {
-            const container = document.getElementById('treeContainer');
-            const totalFixedIncome = members.reduce((s, m) => s + m.fixedIncome, 0);
-
-            // Group Members by Roles (Parents vs Children)
-            const parents = members.filter(m => m.role === 'Pai' || m.role === 'Mãe');
-            const children = members.filter(m => m.role !== 'Pai' && m.role !== 'Mãe');
-
-            let html = `
-                <div class="w-full flex flex-col items-center space-y-6">
-                    <!-- Root House Node -->
-                    <div class="bg-indigo-600/20 border border-indigo-500/40 rounded-2xl p-3 px-6 text-center flex items-center gap-3 shadow-lg">
-                        <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
-                            <i data-lucide="home" class="w-4 h-4"></i>
-                        </div>
-                        <div class="text-left">
-                            <h4 class="text-xs font-bold text-slate-100">${familyName}</h4>
-                            <p class="text-[10px] text-indigo-300 font-semibold">Renda Fixa Total: ${formatCurrency(totalFixedIncome)}</p>
-                        </div>
-                    </div>
-
-                    <!-- Parents Level -->
-                    <div class="w-full flex flex-wrap justify-center gap-4 relative">
-            `;
-
-            const renderMemberCard = (m) => {
-                const percent = totalFixedIncome > 0 ? ((m.fixedIncome / totalFixedIncome) * 100).toFixed(0) : 0;
-                return `
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 w-60 shadow-md tree-card flex flex-col justify-between relative group">
-                        <div class="flex items-start justify-between">
-                            <div class="flex items-center gap-2.5">
-                                <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-indigo-400">
-                                    <i data-lucide="${m.avatar || 'user'}" class="w-4 h-4"></i>
-                                </div>
-                                <div>
-                                    <h5 class="text-xs font-bold text-slate-100">${m.name}</h5>
-                                    <span class="text-[10px] font-semibold text-slate-400">${m.role}</span>
-                                </div>
-                            </div>
-                            <div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                                <button onclick="editMember('${m.id}')" class="text-slate-400 hover:text-indigo-400 p-1"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
-                                <button onclick="deleteMember('${m.id}')" class="text-slate-400 hover:text-rose-400 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-                            </div>
-                        </div>
-
-                        <div class="mt-3 pt-2 border-t border-slate-800/80 flex justify-between items-center text-xs">
-                            <span class="text-[11px] text-slate-400">Renda Fixa:</span>
-                            <span class="font-bold text-emerald-400">${formatCurrency(m.fixedIncome)}</span>
-                        </div>
-
-                        <!-- Progress Share Bar -->
-                        <div class="mt-1.5 w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
-                            <div class="bg-indigo-500 h-full rounded-full" style="width: ${percent}%"></div>
-                        </div>
-                        <span class="text-[9px] text-slate-500 text-right mt-0.5">${percent}% da renda familiar</span>
-                    </div>
-                `;
-            };
-
-            parents.forEach(m => {
-                html += renderMemberCard(m);
-            });
-
-            html += `</div>`;
-
-            if (children.length > 0) {
-                html += `
-                    <!-- Divider Line -->
-                    <div class="w-12 h-px bg-slate-800"></div>
-                    
-                    <!-- Children Level -->
-                    <div class="w-full flex flex-wrap justify-center gap-4">
-                `;
-                children.forEach(m => {
-                    html += renderMemberCard(m);
-                });
-                html += `</div>`;
-            }
-
-            html += `</div>`;
-            container.innerHTML = html;
-            lucide.createIcons();
-        }
-
-        // Render Transactions Table
-        function renderTransactions() {
-            const tbody = document.getElementById('transactionsTableBody');
-            const search = document.getElementById('searchInput').value.toLowerCase();
-            const type = document.getElementById('typeFilter').value;
-
-            const filteredTxs = getFilteredTransactions().filter(tx => {
-                const m = members.find(mem => mem.id === tx.memberId);
-                const memberName = m ? m.name.toLowerCase() : '';
-                const matchesSearch = tx.description.toLowerCase().includes(search) || tx.category.toLowerCase().includes(search) || memberName.includes(search);
-                const matchesType = type === 'all' || tx.type === type;
-                return matchesSearch && matchesType;
-            });
-
-            filteredTxs.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-            if (filteredTxs.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="py-8 text-center text-slate-500 font-normal">
-                            Nenhum lançamento encontrado para os filtros selecionados.
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            tbody.innerHTML = filteredTxs.map(tx => {
-                const member = members.find(m => m.id === tx.memberId) || { name: 'Desconhecido', role: 'N/A' };
-                const isIncome = tx.type === 'income';
-                const formattedDate = new Date(tx.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-
-                return `
-                    <tr class="hover:bg-slate-800/40 transition-colors">
-                        <td class="py-3 px-2">
-                            <div class="flex items-center gap-2">
-                                <div class="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-indigo-400 text-[10px] font-bold">
-                                    ${member.name.substring(0, 2).toUpperCase()}
-                                </div>
-                                <span class="text-slate-300 font-medium">${member.name}</span>
-                            </div>
-                        </td>
-                        <td class="py-3 px-2 text-slate-200 font-semibold">${tx.description}</td>
-                        <td class="py-3 px-2">
-                            <span class="inline-block px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-slate-800 text-slate-300 border border-slate-700/60">
-                                ${tx.category}
-                            </span>
-                        </td>
-                        <td class="py-3 px-2 text-slate-400">${formattedDate}</td>
-                        <td class="py-3 px-2 text-right font-bold ${isIncome ? 'text-emerald-400' : 'text-slate-200'}">
-                            ${isIncome ? '+' : '-'} ${formatCurrency(tx.amount)}
-                        </td>
-                        <td class="py-3 px-2 text-center">
-                            <button onclick="deleteTransaction('${tx.id}')" class="text-slate-500 hover:text-rose-400 p-1 rounded-md transition-colors" title="Excluir">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-
-            lucide.createIcons();
-        }
-
-        function deleteTransaction(id) {
-            transactions = transactions.filter(t => t.id !== id);
-            saveState();
-            filterData();
-        }
-
-        // Render Category Budgets
-        function renderBudgets(currentFilteredTxs) {
-            const container = document.getElementById('budgetList');
-            container.innerHTML = '';
-
-            const categoryExpenses = {};
-            currentFilteredTxs.filter(t => t.type === 'expense').forEach(t => {
-                categoryExpenses[t.category] = (categoryExpenses[t.category] || 0) + t.amount;
-            });
-
-            Object.entries(BUDGET_LIMITS).forEach(([category, limit]) => {
-                const spent = categoryExpenses[category] || 0;
-                const percentage = Math.min(100, Math.round((spent / limit) * 100));
-
-                let progressColor = 'bg-indigo-500';
-                if (percentage > 90) progressColor = 'bg-rose-500';
-                else if (percentage > 75) progressColor = 'bg-amber-500';
-
-                container.innerHTML += `
-                    <div>
-                        <div class="flex justify-between text-xs mb-1.5 font-medium">
-                            <span class="text-slate-200">${category}</span>
-                            <span class="text-slate-400">${formatCurrency(spent)} <span class="text-slate-600">/ ${formatCurrency(limit)}</span></span>
-                        </div>
-                        <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-                            <div class="${progressColor} h-full rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-
-        // Charts Logic
-        function updateCharts() {
-            const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-            const currentYear = new Date().getFullYear();
-            const memberId = document.getElementById('memberFilter').value;
-
-            const incomeData = new Array(12).fill(0);
-            const expenseData = new Array(12).fill(0);
-
-            transactions.forEach(tx => {
-                if (memberId !== 'all' && tx.memberId !== memberId) return;
-
-                const txDate = new Date(tx.date + 'T00:00:00');
-                if (txDate.getFullYear() === currentYear) {
-                    const monthIdx = txDate.getMonth();
-                    if (tx.type === 'income') incomeData[monthIdx] += tx.amount;
-                    else expenseData[monthIdx] += tx.amount;
-                }
-            });
-
-            const ctxMain = document.getElementById('incomeExpenseChart').getContext('2d');
-            if (mainChart) mainChart.destroy();
-
-            mainChart = new Chart(ctxMain, {
-                type: 'bar',
-                data: {
-                    labels: months,
-                    datasets: [
-                        { label: 'Entradas', data: incomeData, backgroundColor: '#10b981', borderRadius: 6, barThickness: 12 },
-                        { label: 'Saídas', data: expenseData, backgroundColor: '#f43f5e', borderRadius: 6, barThickness: 12 }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.raw)}` } }
-                    },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } },
-                        y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 }, callback: (v) => 'R$ ' + v } }
-                    }
-                }
-            });
-
-            // Donut Chart logic
-            const filteredExpenses = getFilteredTransactions().filter(t => t.type === 'expense');
-            const categorySums = {};
-            filteredExpenses.forEach(t => {
-                categorySums[t.category] = (categorySums[t.category] || 0) + t.amount;
-            });
-
-            const categoryLabels = Object.keys(categorySums);
-            const categoryValues = Object.values(categorySums);
-
-            const ctxDonut = document.getElementById('categoryChart').getContext('2d');
-            if (donutChart) donutChart.destroy();
-
-            donutChart = new Chart(ctxDonut, {
-                type: 'doughnut',
-                data: {
-                    labels: categoryLabels.length ? categoryLabels : ['Sem Gastos'],
-                    datasets: [{
-                        data: categoryValues.length ? categoryValues : [1],
-                        backgroundColor: categoryValues.length ? [
-                            '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#f43f5e', '#64748b'
-                        ] : ['#334155'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12, boxWidth: 10 } },
-                        tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${formatCurrency(ctx.raw)}` } }
-                    },
-                    cutout: '70%'
-                }
-            });
-        }
-
-        // Member Modal Actions
+        // Modais Controls
         function openMemberModal(editId = null) {
             const modal = document.getElementById('memberModal');
             const container = document.getElementById('memberModalContainer');
-            
+            const form = document.getElementById('memberForm');
+
             if (editId) {
                 const member = members.find(m => m.id === editId);
                 if (member) {
-                    document.getElementById('memberModalTitle').innerText = 'Editar Membro';
                     document.getElementById('memberEditId').value = member.id;
                     document.getElementById('memberName').value = member.name;
                     document.getElementById('memberRole').value = member.role;
-                    document.getElementById('memberAvatar').value = member.avatar || 'user';
                     document.getElementById('memberFixedIncome').value = member.fixedIncome;
+                    document.getElementById('memberAvatar').value = member.avatar || 'user';
+                    document.getElementById('memberModalTitle').innerText = 'Editar Membro Familiar';
                 }
             } else {
-                document.getElementById('memberModalTitle').innerText = 'Adicionar Membro Familiar';
-                document.getElementById('memberForm').reset();
+                form.reset();
                 document.getElementById('memberEditId').value = '';
+                document.getElementById('memberModalTitle').innerText = 'Adicionar Membro Familiar';
             }
 
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
                 container.classList.remove('scale-95');
-                container.classList.add('scale-100');
             }, 10);
         }
 
         function closeMemberModal() {
             const modal = document.getElementById('memberModal');
             const container = document.getElementById('memberModalContainer');
-            container.classList.remove('scale-100');
-            container.classList.add('scale-95');
             modal.classList.add('opacity-0');
+            container.classList.add('scale-95');
             setTimeout(() => modal.classList.add('hidden'), 200);
         }
 
-        function handleSaveMember(e) {
-            e.preventDefault();
-            const editId = document.getElementById('memberEditId').value;
-            const name = document.getElementById('memberName').value;
-            const role = document.getElementById('memberRole').value;
-            const avatar = document.getElementById('memberAvatar').value;
-            const fixedIncome = parseFloat(document.getElementById('memberFixedIncome').value) || 0;
-
-            if (editId) {
-                const m = members.find(mem => mem.id === editId);
-                if (m) {
-                    m.name = name;
-                    m.role = role;
-                    m.avatar = avatar;
-                    m.fixedIncome = fixedIncome;
-                }
-            } else {
-                const newMember = {
-                    id: 'm_' + Date.now(),
-                    name,
-                    role,
-                    avatar,
-                    fixedIncome
-                };
-                members.push(newMember);
-            }
-
-            saveState();
-            refreshMemberSelects();
-            filterData();
-            closeMemberModal();
-        }
-
-        function editMember(id) {
-            openMemberModal(id);
-        }
-
-        function deleteMember(id) {
-            if (members.length <= 1) {
-                alert('É necessário manter pelo menos um membro na família.');
-                return;
-            }
-            members = members.filter(m => m.id !== id);
-            // Re-assign transactions of deleted member to first available member
-            transactions.forEach(t => {
-                if (t.memberId === id) t.memberId = members[0].id;
-            });
-
-            saveState();
-            refreshMemberSelects();
-            filterData();
-        }
-
-        // Family Name Modal
         function openFamilySettingsModal() {
+            document.getElementById('familyInputName').value = familyName;
             const modal = document.getElementById('familySettingsModal');
             const container = document.getElementById('familySettingsModalContainer');
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
                 container.classList.remove('scale-95');
-                container.classList.add('scale-100');
             }, 10);
         }
 
         function closeFamilySettingsModal() {
             const modal = document.getElementById('familySettingsModal');
             const container = document.getElementById('familySettingsModalContainer');
-            container.classList.remove('scale-100');
-            container.classList.add('scale-95');
             modal.classList.add('opacity-0');
+            container.classList.add('scale-95');
             setTimeout(() => modal.classList.add('hidden'), 200);
         }
 
-        function handleSaveFamilyName(e) {
-            e.preventDefault();
-            familyName = document.getElementById('familyInputName').value;
-            saveState();
-            updateFamilyNameDisplay();
-            renderFamilyTree();
-            closeFamilySettingsModal();
-        }
-
-        // Transaction Modal Controls
         function openTransactionModal() {
+            updateCategoryOptions();
+            document.getElementById('txDate').valueAsDate = new Date();
             const modal = document.getElementById('transactionModal');
             const container = document.getElementById('txModalContainer');
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
                 container.classList.remove('scale-95');
-                container.classList.add('scale-100');
             }, 10);
         }
 
         function closeTransactionModal() {
             const modal = document.getElementById('transactionModal');
             const container = document.getElementById('txModalContainer');
-            container.classList.remove('scale-100');
-            container.classList.add('scale-95');
             modal.classList.add('opacity-0');
+            container.classList.add('scale-95');
             setTimeout(() => modal.classList.add('hidden'), 200);
         }
 
@@ -1046,24 +588,504 @@
             categorySelect.innerHTML = CATEGORIES[type].map(c => `<option value="${c}">${c}</option>`).join('');
         }
 
-        function handleAddTransaction(e) {
+        // State Preservers
+        function saveData() {
+            localStorage.setItem('finflux_family_name', familyName);
+            localStorage.setItem('finflux_members', JSON.stringify(members));
+            localStorage.setItem('finflux_transactions', JSON.stringify(transactions));
+            if (familyId) localStorage.setItem('finflux_family_id', familyId);
+        }
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('familyNameDisplay').innerText = familyName;
+            await syncWithBackend();
+            populateMemberDropdowns();
+            filterData();
+            lucide.createIcons();
+        });
+
+        // Backend Syncing (Non-blocking fallback)
+        async function syncWithBackend() {
+            try {
+                if (!familyId) {
+                    const res = await fetch(`${API_URL}/families`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: familyName })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        familyId = data.id;
+                        saveData();
+                    }
+                }
+
+                if (familyId) {
+                    const famRes = await fetch(`${API_URL}/families/${familyId}`);
+                    if (famRes.ok) {
+                        const family = await famRes.json();
+                        if (family.members && family.members.length > 0) {
+                            members = family.members.map(m => ({
+                                id: m.id,
+                                name: m.name,
+                                role: m.role || 'Membro',
+                                fixedIncome: m.fixed_income || 0,
+                                avatar: 'user'
+                            }));
+                        }
+                    }
+
+                    const txRes = await fetch(`${API_URL}/transactions?family_id=${familyId}`);
+                    if (txRes.ok) {
+                        const remoteTxs = await txRes.json();
+                        if (Array.isArray(remoteTxs) && remoteTxs.length > 0) {
+                            transactions = remoteTxs.map(t => ({
+                                id: t.id,
+                                memberId: t.member_id,
+                                description: t.description,
+                                amount: t.amount,
+                                type: (t.type || '').toLowerCase(),
+                                category: t.category,
+                                date: t.date ? t.date.split('T')[0] : new Date().toISOString().split('T')[0]
+                            }));
+                        }
+                    }
+                    saveData();
+                }
+            } catch (err) {
+                console.log('Modo Offline / Servidor API indisponível. Usando armazenamento local.');
+            }
+        }
+
+        function populateMemberDropdowns() {
+            const memberFilter = document.getElementById('memberFilter');
+            const txMemberSelect = document.getElementById('txMemberId');
+
+            const currentFilter = memberFilter.value;
+            memberFilter.innerHTML = '<option value="all">Consolidado Família</option>';
+            txMemberSelect.innerHTML = '';
+
+            members.forEach(m => {
+                const optionHtml = `<option value="${m.id}">${m.name} (${m.role})</option>`;
+                memberFilter.innerHTML += optionHtml;
+                txMemberSelect.innerHTML += optionHtml;
+            });
+
+            if (currentFilter && members.some(m => m.id === currentFilter)) {
+                memberFilter.value = currentFilter;
+            } else {
+                memberFilter.value = 'all';
+            }
+        }
+
+        // Filtering and UI Updates
+        function filterData() {
+            const selectedMemberId = document.getElementById('memberFilter').value;
+            const selectedPeriod = document.getElementById('periodFilter').value;
+
+            let filteredTransactions = [...transactions];
+
+            // Member filter
+            if (selectedMemberId !== 'all') {
+                filteredTransactions = filteredTransactions.filter(t => t.memberId === selectedMemberId);
+                const member = members.find(m => m.id === selectedMemberId);
+                document.getElementById('headerTitle').innerText = member ? `Painel de ${member.name}` : 'Painel Individual';
+                document.getElementById('activeFilterBadge').innerText = member ? member.role : 'Filtro Ativo';
+            } else {
+                document.getElementById('headerTitle').innerText = 'Painel Consolidado';
+                document.getElementById('activeFilterBadge').innerText = 'Todos os Membros';
+            }
+
+            // Period filter
+            const now = new Date();
+            if (selectedPeriod === 'this-month') {
+                filteredTransactions = filteredTransactions.filter(t => {
+                    const d = new Date(t.date);
+                    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                });
+            } else if (selectedPeriod === 'last-month') {
+                filteredTransactions = filteredTransactions.filter(t => {
+                    const d = new Date(t.date);
+                    return d.getMonth() === (now.getMonth() - 1) && d.getFullYear() === now.getFullYear();
+                });
+            } else if (selectedPeriod === 'year') {
+                filteredTransactions = filteredTransactions.filter(t => {
+                    const d = new Date(t.date);
+                    return d.getFullYear() === now.getFullYear();
+                });
+            }
+
+            updateSummaryCards(filteredTransactions, selectedMemberId);
+            renderFamilyTree();
+            renderTransactions(filteredTransactions);
+            renderBudgets(filteredTransactions);
+            renderCharts(filteredTransactions);
+        }
+
+        function updateSummaryCards(txList, activeMemberId) {
+            const totalIncome = txList.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
+            const totalExpense = txList.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+            const netBalance = totalIncome - totalExpense;
+
+            document.getElementById('cardIncome').innerText = formatCurrency(totalIncome);
+            document.getElementById('cardExpenses').innerText = formatCurrency(totalExpense);
+            document.getElementById('cardBalance').innerText = formatCurrency(netBalance);
+
+            // Calculate share percentages
+            const allIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
+            const allExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+
+            if (activeMemberId !== 'all') {
+                const incomeShare = allIncome > 0 ? Math.round((totalIncome / allIncome) * 100) : 0;
+                const expenseShare = allExpense > 0 ? Math.round((totalExpense / allExpense) * 100) : 0;
+                document.getElementById('incomeMemberShare').innerText = `${incomeShare}% do Total`;
+                document.getElementById('expenseMemberShare').innerText = `${expenseShare}% do Total`;
+            } else {
+                document.getElementById('incomeMemberShare').innerText = '100%';
+                document.getElementById('expenseMemberShare').innerText = '100%';
+            }
+
+            const totalFixedIncome = members.reduce((acc, m) => acc + (parseFloat(m.fixedIncome) || 0), 0);
+            document.getElementById('cardMemberCount').innerText = members.length;
+            document.getElementById('totalFixedIncomeText').innerText = `Base Fixa: ${formatCurrency(totalFixedIncome)}`;
+        }
+
+        function renderFamilyTree() {
+            const treeContainer = document.getElementById('treeContainer');
+            const totalFamilyFixedIncome = members.reduce((acc, m) => acc + (parseFloat(m.fixedIncome) || 0), 0);
+
+            let parentsHtml = '';
+            let childrenHtml = '';
+
+            members.forEach(m => {
+                const memberFixedIncome = parseFloat(m.fixedIncome) || 0;
+                const incomePct = totalFamilyFixedIncome > 0 ? Math.round((memberFixedIncome / totalFamilyFixedIncome) * 100) : 0;
+
+                const cardHtml = `
+                    <div class="tree-card bg-slate-900 border border-slate-800 rounded-2xl p-4 w-64 shadow-lg relative group">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold border border-indigo-500/30">
+                                    <i data-lucide="${m.avatar || 'user'}" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-sm text-slate-100 leading-snug">${m.name}</h4>
+                                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${m.role}</span>
+                                </div>
+                            </div>
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                <button onclick="openMemberModal('${m.id}')" class="p-1 hover:text-indigo-400 text-slate-500"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="deleteMember('${m.id}')" class="p-1 hover:text-rose-400 text-slate-500"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 pt-2 border-t border-slate-800/80">
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="text-slate-400 font-medium">Renda Base Fixa:</span>
+                                <span class="font-semibold text-emerald-400">${formatCurrency(memberFixedIncome)}</span>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-center text-[10px] text-slate-400 mb-1">
+                                    <span>Part. do Salário Familiar</span>
+                                    <span class="font-bold text-indigo-400">${incomePct}%</span>
+                                </div>
+                                <div class="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                                    <div class="bg-indigo-500 h-full rounded-full" style="width: ${incomePct}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                if (m.role === 'Pai' || m.role === 'Mãe' || m.role === 'Responsável') {
+                    parentsHtml += cardHtml;
+                } else {
+                    childrenHtml += cardHtml;
+                }
+            });
+
+            treeContainer.innerHTML = `
+                <div class="flex flex-col items-center gap-8 w-full py-2">
+                    <div class="flex flex-wrap justify-center gap-6 z-10">
+                        ${parentsHtml || '<p class="text-xs text-slate-500">Nenhum responsável cadastrado.</p>'}
+                    </div>
+                    ${childrenHtml ? `
+                        <div class="w-32 h-px bg-slate-800 relative">
+                            <div class="absolute left-1/2 -top-3 -translate-x-1/2 bg-slate-900 border border-slate-800 rounded-full p-1 text-slate-500">
+                                <i data-lucide="arrow-down" class="w-3 h-3"></i>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap justify-center gap-6 z-10">
+                            ${childrenHtml}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function renderTransactions(txListToRender) {
+            const list = txListToRender || transactions;
+            const searchVal = document.getElementById('searchInput').value.toLowerCase();
+            const typeFilter = document.getElementById('typeFilter').value;
+
+            const tbody = document.getElementById('transactionsTableBody');
+            tbody.innerHTML = '';
+
+            let filtered = list.filter(t => {
+                const matchesSearch = t.description.toLowerCase().includes(searchVal) || t.category.toLowerCase().includes(searchVal);
+                const matchesType = typeFilter === 'all' || t.type === typeFilter;
+                return matchesSearch && matchesType;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-500 text-xs">Nenhum lançamento registrado para este filtro.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(t => {
+                const member = members.find(m => m.id === t.memberId);
+                const memberName = member ? member.name : 'Família';
+                const isIncome = t.type === 'income';
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-800/40 transition-colors">
+                        <td class="py-3 px-2">
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-indigo-400">
+                                    ${memberName.charAt(0)}
+                                </div>
+                                <span class="text-slate-200 font-semibold">${memberName}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-2 text-slate-300">${t.description}</td>
+                        <td class="py-3 px-2">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-800 text-slate-300 border border-slate-700/50">
+                                ${t.category}
+                            </span>
+                        </td>
+                        <td class="py-3 px-2 text-slate-400">${t.date}</td>
+                        <td class="py-3 px-2 text-right font-bold ${isIncome ? 'text-emerald-400' : 'text-rose-400'}">
+                            ${isIncome ? '+' : '-'} ${formatCurrency(t.amount)}
+                        </td>
+                        <td class="py-3 px-2 text-center">
+                            <button onclick="deleteTransaction('${t.id}')" class="text-slate-500 hover:text-rose-400 p-1 transition-colors">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            lucide.createIcons();
+        }
+
+        function renderBudgets(txList) {
+            const budgetList = document.getElementById('budgetList');
+            budgetList.innerHTML = '';
+
+            const expenses = txList.filter(t => t.type === 'expense');
+
+            Object.keys(BUDGET_LIMITS).forEach(category => {
+                const limit = BUDGET_LIMITS[category];
+                const spent = expenses.filter(t => t.category === category).reduce((acc, t) => acc + t.amount, 0);
+                const percent = Math.min(Math.round((spent / limit) * 100), 100);
+
+                let progressColor = 'bg-indigo-500';
+                if (percent > 75) progressColor = 'bg-amber-500';
+                if (percent >= 100) progressColor = 'bg-rose-500';
+
+                budgetList.innerHTML += `
+                    <div>
+                        <div class="flex items-center justify-between text-xs mb-1">
+                            <span class="font-semibold text-slate-300">${category}</span>
+                            <span class="text-slate-400">${formatCurrency(spent)} / <span class="text-slate-500">${formatCurrency(limit)}</span></span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                            <div class="h-full ${progressColor} transition-all duration-300 rounded-full" style="width: ${percent}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderCharts(txList) {
+            if (incomeExpenseChart) incomeExpenseChart.destroy();
+            if (categoryChart) categoryChart.destroy();
+
+            // 1. Fluxo Mensal Chart
+            const ctx1 = document.getElementById('incomeExpenseChart').getContext('2d');
+            const totalInc = txList.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
+            const totalExp = txList.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+
+            incomeExpenseChart = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['Período Ativo'],
+                    datasets: [
+                        { label: 'Entradas', data: [totalInc], backgroundColor: '#10b981', borderRadius: 8, barThickness: 40 },
+                        { label: 'Saídas', data: [totalExp], backgroundColor: '#f43f5e', borderRadius: 8, barThickness: 40 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+
+            // 2. Categories Chart
+            const ctx2 = document.getElementById('categoryChart').getContext('2d');
+            const expenseCategories = CATEGORIES.expense;
+            const categoryTotals = expenseCategories.map(cat => {
+                return txList.filter(t => t.type === 'expense' && t.category === cat).reduce((acc, t) => acc + t.amount, 0);
+            });
+
+            categoryChart = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: expenseCategories,
+                    datasets: [{
+                        data: categoryTotals,
+                        backgroundColor: ['#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12 } }
+                    }
+                }
+            });
+        }
+
+        // --- Action Handlers ---
+        async function handleSaveMember(e) {
             e.preventDefault();
+            const editId = document.getElementById('memberEditId').value;
+            const name = document.getElementById('memberName').value;
+            const role = document.getElementById('memberRole').value;
+            const fixedIncome = parseFloat(document.getElementById('memberFixedIncome').value) || 0;
+            const avatar = document.getElementById('memberAvatar').value;
+
+            if (editId) {
+                const index = members.findIndex(m => m.id === editId);
+                if (index !== -1) {
+                    members[index] = { ...members[index], name, role, fixedIncome, avatar };
+                }
+            } else {
+                const newMember = {
+                    id: 'm_' + Date.now(),
+                    name,
+                    role,
+                    fixedIncome,
+                    avatar
+                };
+                members.push(newMember);
+
+                // API Async Sync
+                if (familyId) {
+                    try {
+                        await fetch(`${API_URL}/families/${familyId}/members`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name, role })
+                        });
+                    } catch (err) { console.log('Salvo apenas localmente.'); }
+                }
+            }
+
+            saveData();
+            populateMemberDropdowns();
+            closeMemberModal();
+            filterData();
+        }
+
+        function deleteMember(id) {
+            if (members.length <= 1) {
+                alert('A família precisa ter ao menos um integrante.');
+                return;
+            }
+            if (!confirm('Tem certeza que deseja remover este membro e desvincular suas transações?')) return;
+
+            members = members.filter(m => m.id !== id);
+            saveData();
+            populateMemberDropdowns();
+            filterData();
+        }
+
+        function handleSaveFamilyName(e) {
+            e.preventDefault();
+            familyName = document.getElementById('familyInputName').value;
+            document.getElementById('familyNameDisplay').innerText = familyName;
+            saveData();
+            closeFamilySettingsModal();
+        }
+
+        async function handleAddTransaction(e) {
+            e.preventDefault();
+            const memberId = document.getElementById('txMemberId').value;
+            const description = document.getElementById('txDescription').value;
+            const amount = parseFloat(document.getElementById('txAmount').value);
+            const type = document.getElementById('txType').value;
+            const category = document.getElementById('txCategory').value;
+            const date = document.getElementById('txDate').value;
+
             const newTx = {
                 id: 't_' + Date.now(),
-                memberId: document.getElementById('txMemberId').value,
-                description: document.getElementById('txDescription').value,
-                amount: parseFloat(document.getElementById('txAmount').value),
-                type: document.getElementById('txType').value,
-                category: document.getElementById('txCategory').value,
-                date: document.getElementById('txDate').value
+                memberId,
+                description,
+                amount,
+                type,
+                category,
+                date
             };
 
-            transactions.push(newTx);
-            saveState();
-            filterData();
+            transactions.unshift(newTx);
+
+            // API Async Sync
+            if (familyId) {
+                try {
+                    await fetch(`${API_URL}/transactions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            family_id: familyId,
+                            member_id: memberId,
+                            description,
+                            amount,
+                            type: type.toUpperCase(),
+                            category,
+                            date: new Date(date).toISOString()
+                        })
+                    });
+                } catch (err) { console.log('Transação salva localmente.'); }
+            }
+
+            saveData();
             closeTransactionModal();
             document.getElementById('transactionForm').reset();
-            document.getElementById('txDate').valueAsDate = new Date();
+            filterData();
+        }
+
+        async function deleteTransaction(id) {
+            if (!confirm('Excluir este lançamento financeiro?')) return;
+            transactions = transactions.filter(t => t.id !== id);
+
+            if (familyId) {
+                try {
+                    await fetch(`${API_URL}/transactions/${id}?family_id=${familyId}`, { method: 'DELETE' });
+                } catch (err) { console.log('Excluído apenas localmente.'); }
+            }
+
+            saveData();
+            filterData();
         }
     </script>
 </body>
