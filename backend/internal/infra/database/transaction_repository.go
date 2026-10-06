@@ -33,5 +33,12 @@ func (r *transactionRepository) FindByFamilyID(ctx context.Context, familyID str
 }
 
 func (r *transactionRepository) Delete(ctx context.Context, id string, familyID string) error {
-	return r.db.WithContext(ctx).Where("id = ? AND family_id = ?", id, familyID).Delete(&domain.Transaction{}).Error
+	result := r.db.WithContext(ctx).Where("id = ? AND family_id = ?", id, familyID).Delete(&domain.Transaction{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrTransactionNotFound
+	}
+	return nil
 }
