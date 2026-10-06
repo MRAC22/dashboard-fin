@@ -50,6 +50,8 @@ func main() {
 	}
 
 	api.POST("/transactions", txHandler.Create)
+	api.GET("/transactions", txHandler.List)
+	api.DELETE("/transactions/:id", txHandler.Delete)
 
 	port := os.Getenv("PORT")
 	if port == "" {

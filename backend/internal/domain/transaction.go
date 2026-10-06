@@ -14,18 +14,19 @@ const (
 )
 
 var (
-	ErrInvalidAmount = errors.New("o valor da transação deve ser maior que zero")
+	ErrTransactionNotFound = errors.New("transação não encontrada")
+	ErrInvalidAmount       = errors.New("o valor deve ser maior que zero")
 )
 
 type Transaction struct {
 	ID          string          `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	FamilyID    string          `json:"family_id" gorm:"type:uuid;not null"`
-	MemberID    *string         `json:"member_id,omitempty" gorm:"type:uuid"`
+	FamilyID    string          `json:"family_id" gorm:"index;not null"`
+	MemberID    *string         `json:"member_id" gorm:"index"`
 	Description string          `json:"description" gorm:"not null"`
-	Amount      float64         `json:"amount" gorm:"type:numeric(10,2);not null"`
-	Type        TransactionType `json:"type" gorm:"type:varchar(10);not null"`
+	Amount      float64         `json:"amount" gorm:"not null"`
+	Type        TransactionType `json:"type" gorm:"not null"`
 	Category    string          `json:"category" gorm:"not null"`
-	Date        time.Time       `json:"date" gorm:"type:date;not null"`
+	Date        time.Time       `json:"date" gorm:"not null"`
 	CreatedAt   time.Time       `json:"created_at"`
 }
 

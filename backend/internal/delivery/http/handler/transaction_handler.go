@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"dashboard-fin/internal/domain"
 	"dashboard-fin/internal/usecase"
 )
 
@@ -35,4 +36,41 @@ func (h *TransactionHandler) Create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, tx)
+}
+
+func (h *TransactionHandler) List(c *gin.Context) {
+	familyID := c.GetString("family_id")
+	if familyID == "" {
+		familyID = c.Query("family_id")
+	}
+
+	memberID := c.Query("member_id")
+
+	transactions, err := h.useCase.ListByFamily(c.Request.Context(), familyID, memberID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, transactions)
+}
+
+func (h *TransactionHandler) Delete(c *gin.Context) {
+	id := c.Param("id")
+	familyID := c.GetString("family_id")
+	if familyID == "" {
+		familyID = c.Query("family_id")
+	}
+
+	err := h.useCase.Delete(c.Request.Context(), id, familyID)
+	if err != nil {
+		if err == domain.ErrTransactionNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }

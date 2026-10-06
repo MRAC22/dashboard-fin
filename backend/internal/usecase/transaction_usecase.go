@@ -20,6 +20,7 @@ type CreateTransactionInput struct {
 type TransactionUseCase interface {
 	Create(ctx context.Context, input CreateTransactionInput) (*domain.Transaction, error)
 	ListByFamily(ctx context.Context, familyID string, memberID string) ([]domain.Transaction, error)
+	Delete(ctx context.Context, id string, familyID string) error
 }
 
 type transactionUseCase struct {
@@ -55,4 +56,8 @@ func (uc *transactionUseCase) Create(ctx context.Context, input CreateTransactio
 
 func (uc *transactionUseCase) ListByFamily(ctx context.Context, familyID string, memberID string) ([]domain.Transaction, error) {
 	return uc.repo.FindByFamilyID(ctx, familyID, memberID)
+}
+
+func (uc *transactionUseCase) Delete(ctx context.Context, id string, familyID string) error {
+	return uc.repo.Delete(ctx, id, familyID)
 }
